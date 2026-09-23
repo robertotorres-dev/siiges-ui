@@ -34,8 +34,21 @@ function ModalState() {
   };
 }
 
-export default function InstitucionesTable({ instituciones, session }) {
-  const { rol } = session;
+export default function InstitucionesTable({
+  instituciones,
+  session,
+  pagination,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
+  sortModel,
+  onSortModelChange,
+  onSearch,
+  onReload,
+  loading,
+}) {
+  const { rol } = session || {};
   const [rows, setRows] = useState([]);
 
   const {
@@ -46,8 +59,10 @@ export default function InstitucionesTable({ instituciones, session }) {
     if (instituciones && instituciones.length) {
       const tableRows = formattedRows(instituciones, rol);
       setRows(tableRows);
+    } else {
+      setRows([]);
     }
-  }, [instituciones]);
+  }, [instituciones, rol]);
 
   return (
     <Grid container sx={{ marginTop: 2 }}>
@@ -55,6 +70,18 @@ export default function InstitucionesTable({ instituciones, session }) {
         title="Tabla Instituciones"
         rows={rows}
         columns={institucionesColumns(showModal)}
+        paginationMode="server"
+        rowCount={pagination?.total || 0}
+        page={page}
+        pageSize={pageSize}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        sortModel={sortModel}
+        onSortModelChange={onSortModelChange}
+        onSearch={onSearch}
+        onReloadClick={onReload}
+        buttonAdd={false}
+        loading={loading}
       />
       <DefaultModal open={modal} setOpen={hideModal} id={modalId} title="Eliminar Institución">
         <Typography>
@@ -97,9 +124,35 @@ InstitucionesTable.propTypes = {
   ),
   session: PropTypes.shape({
     rol: PropTypes.string,
-  }).isRequired,
+  }),
+  pagination: PropTypes.shape({
+    total: PropTypes.number,
+  }),
+  page: PropTypes.number,
+  pageSize: PropTypes.number,
+  onPageChange: PropTypes.func,
+  onPageSizeChange: PropTypes.func,
+  sortModel: PropTypes.arrayOf(PropTypes.shape({
+    field: PropTypes.string,
+    sort: PropTypes.oneOf(['asc', 'desc']),
+  })),
+  onSortModelChange: PropTypes.func,
+  onSearch: PropTypes.func,
+  onReload: PropTypes.func,
+  loading: PropTypes.bool,
 };
 
 InstitucionesTable.defaultProps = {
   instituciones: [] || undefined,
+  session: { rol: '' },
+  pagination: { total: 0 },
+  page: 0,
+  pageSize: 10,
+  onPageChange: () => {},
+  onPageSizeChange: () => {},
+  sortModel: [{ field: 'nombre', sort: 'asc' }],
+  onSortModelChange: () => {},
+  onSearch: () => {},
+  onReload: () => {},
+  loading: false,
 };

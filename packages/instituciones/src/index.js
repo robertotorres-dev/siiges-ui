@@ -1,6 +1,7 @@
 import InstitucionBox from './components/Instituciones/InstitucionBox';
 import InstitucionView from './components/Instituciones/InstitucionView';
 import InstitucionesTable from './components/Instituciones/InstitucionesTable';
+import InstitucionesSkeleton from './components/Instituciones/InstitucionesSkeleton';
 import InstitucionForm from './components/Instituciones/InstitucionForm';
 import EditInstitutionForm from './components/Instituciones/editInstitutionForm';
 import PlantelNewForm from './components/Planteles/PlantelNewForm';
@@ -27,6 +28,7 @@ export {
   InstitucionBox,
   InstitucionView,
   InstitucionesTable,
+  InstitucionesSkeleton,
   InstitucionForm,
   EditInstitutionForm,
   PlantelNewForm,

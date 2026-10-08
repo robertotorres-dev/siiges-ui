@@ -56,6 +56,7 @@ function DataTable({
 
   const debouncedSearch = useCallback(
     debounce((value, dataRows = []) => {
+      const normalizedValue = value.toLowerCase();
       const filteredData = dataRows.filter((row) => {
         const primitiveValues = Object.values(row || {}).filter(
           (data) => data != null && typeof data !== 'object',
@@ -74,16 +75,18 @@ function DataTable({
 
         const allValues = [...primitiveValues, ...getterValues];
 
-        return allValues.some((data) => data.toString().toLowerCase().includes(value));
+        return allValues.some(
+          (data) => data.toString().toLowerCase().includes(normalizedValue),
+        );
       });
 
-      setFilteredRows(value ? filteredData : dataRows);
+      setFilteredRows(normalizedValue ? filteredData : dataRows);
     }, 300),
     [columns],
   );
 
   const handleSearch = (event) => {
-    const value = event.target.value.toLowerCase();
+    const { value } = event.target;
     setSearchText(value);
     if (paginationMode === 'client') {
       debouncedSearch(value, rows);
@@ -100,6 +103,16 @@ function DataTable({
     if (event.key === 'Enter') {
       handleSearchSubmit();
     }
+  };
+
+  const handleReload = () => {
+    setSearchText('');
+    if (paginationMode === 'server') {
+      onSearch('');
+    } else {
+      setFilteredRows(rows);
+    }
+    onReloadClick();
   };
 
   const localeText = {
@@ -145,7 +158,7 @@ function DataTable({
               {onReloadClick && (
                 <MuiButton
                   variant="text"
-                  onClick={onReloadClick}
+                  onClick={handleReload}
                   disabled={buttonReloadDisabled}
                   startIcon={<RefreshIcon />}
                   sx={{ textTransform: 'none' }}

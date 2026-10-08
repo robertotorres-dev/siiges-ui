@@ -50,6 +50,24 @@ describe('usuarios.service - getUsers', () => {
     );
   });
 
+  it('forwards the name or status search term to the users API', async () => {
+    mockFetch({ data: [] });
+    const { getUsers } = getService();
+
+    await getUsers({
+      session,
+      page: 0,
+      limit: 10,
+      search: 'Activado',
+      sortBy: 'nombre',
+      sortOrder: 'asc',
+    });
+
+    const requestUrl = new URL(global.fetch.mock.calls[0][0]);
+    expect(requestUrl.searchParams.get('search')).toBe('Activado');
+    expect(requestUrl.searchParams.get('sortBy')).toBe('nombre');
+  });
+
   it('rejects for unauthorized role', async () => {
     const { getUsers } = getService();
     await expect(getUsers({ session: { ...session, rol: 'otros' } })).rejects.toThrow();

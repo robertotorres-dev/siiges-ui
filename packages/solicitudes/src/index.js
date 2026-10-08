@@ -24,9 +24,11 @@ import useProgramaById from './components/utils/useProgramaById';
 import Actualizacion from './components/ModuleSelector/Actualizacion';
 import CambioNombreInstitucion from './components/ModuleSelector/CambioNombreInstitucion';
 import CambioRepresentanteLegal from './components/ModuleSelector/CambioRepresentanteLegal';
+import SolicitudesSkeleton from './components/SolicitudesSkeleton';
 
 export {
   CambioRepresentanteLegal,
+  SolicitudesSkeleton,
   CambioNombreInstitucion,
   Actualizacion,
   useProgramaById,

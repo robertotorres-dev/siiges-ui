@@ -1,5 +1,6 @@
 import React, {
-  useEffect, useMemo, useState,
+  useCallback, useEffect, useMemo, useState,
+  useRef,
 } from 'react';
 import {
   NewRequest,
@@ -9,15 +10,17 @@ import {
   columnsSolicitudes,
   Actualizacion,
   CambioNombreInstitucion,
+  SolicitudesSkeleton,
 } from '@siiges-ui/solicitudes';
 import {
-  Layout, Select, DataTable, useAuth,
+  Layout, Select, DataTable, Loading, useAuth, useNotification,
 } from '@siiges-ui/shared';
 import { Divider } from '@mui/material';
 import dayjs from 'dayjs';
 
 export default function Solicitudes() {
   const { session } = useAuth();
+  const notify = useNotification();
   const [newSolicitud, setNewSolicitud] = useState(false);
   const [option, setOption] = useState();
   const [NewRequestContentVisible, setNewRequestContentVisible] = useState(false);
@@ -26,8 +29,50 @@ export default function Solicitudes() {
   const [ActualizacionContentVisible, setActualizacionContentVisible] = useState(false);
   // const [RepLegalContentVisible, setRepLegalContentVisible] = useState(false);
   const [NombreInstitucionContentVisible, setNombreInstitucionContentVisible] = useState(false);
-  const [rows, setRows] = useState([]);
-  const { solicitudes } = getSolicitudes();
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState('');
+  const [sortModel, setSortModel] = useState([{ field: 'id', sort: 'asc' }]);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const hasCompletedInitialLoadRef = useRef(false);
+  const activeSort = sortModel[0] || { field: 'id', sort: 'asc' };
+  const {
+    solicitudes,
+    pagination,
+    hasAcuerdoRvoe: hasAcuerdoRvoeFromApi,
+    loading,
+    error,
+  } = getSolicitudes({
+    page,
+    limit: pageSize,
+    search,
+    sortBy: activeSort.field,
+    sortOrder: activeSort.sort,
+    refreshKey,
+  });
+  const isSessionReady = Boolean(session?.rol);
+
+  useEffect(() => {
+    if (isSessionReady && !loading) {
+      hasCompletedInitialLoadRef.current = true;
+    }
+  }, [isSessionReady, loading]);
+
+  const rows = useMemo(() => solicitudes.map((solicitud) => ({
+    id: solicitud.id,
+    estatus: solicitud.estatusSolicitudId,
+    folio: solicitud.folio,
+    tipoSolicitud: solicitud.tipoSolicitud?.nombre,
+    programa: solicitud.programa?.nombre,
+    acuerdoRvoe: solicitud.programa?.acuerdoRvoe,
+    estatusSolicitudId: solicitud.estatusSolicitud?.nombre,
+    institucion: solicitud?.programa?.plantel?.institucion?.nombre,
+    fechaIncorporacion: solicitud.fechaIncorporacion
+      ? dayjs(solicitud.fechaIncorporacion).format('DD/MM/YYYY')
+      : '—',
+    plantel: `${solicitud.programa?.plantel?.domicilio?.calle} #${solicitud.programa?.plantel?.domicilio?.numeroExterior}`,
+    actions: 'Actions Placeholder',
+  })), [solicitudes]);
 
   useEffect(() => {
     setNewRequestContentVisible(option === 'new');
@@ -37,37 +82,6 @@ export default function Solicitudes() {
     // setRepLegalContentVisible(option === 'repLegal');
     setNombreInstitucionContentVisible(option === 'nombreInstitucion');
   }, [option]);
-
-  useEffect(() => {
-    if (solicitudes !== undefined && solicitudes !== null) {
-      let filteredSolicitudes;
-
-      if (session.rol === 'control_documental') {
-        filteredSolicitudes = solicitudes.filter(
-          (solicitud) => [2, 3].includes(solicitud.estatusSolicitudId),
-        );
-      } else {
-        filteredSolicitudes = solicitudes;
-      }
-      const formattedRows = filteredSolicitudes.map((solicitud) => ({
-        id: solicitud.id,
-        estatus: solicitud.estatusSolicitudId,
-        folio: solicitud.folio,
-        tipoSolicitud: solicitud.tipoSolicitud?.nombre,
-        programa: solicitud.programa?.nombre,
-        acuerdoRvoe: solicitud.programa?.acuerdoRvoe,
-        estatusSolicitudId: solicitud.estatusSolicitud?.nombre,
-        institucion: solicitud?.programa?.plantel?.institucion?.nombre,
-        fechaIncorporacion: solicitud.fechaIncorporacion
-          ? dayjs(solicitud.fechaIncorporacion).format('DD/MM/YYYY')
-          : '—',
-        plantel: `${solicitud.programa?.plantel?.domicilio?.calle} #${solicitud.programa?.plantel?.domicilio?.numeroExterior}`,
-        actions: 'Actions Placeholder',
-      }));
-
-      setRows(formattedRows);
-    }
-  }, [solicitudes, session.rol]);
 
   useEffect(() => {
     if (session.rol === 'representante') {
@@ -85,9 +99,37 @@ export default function Solicitudes() {
     setOption(e.target.value);
   };
 
-  const hasAcuerdoRvoe = useMemo(() => solicitudes?.some(
-    (s) => s.programa?.acuerdoRvoe && s.programa.acuerdoRvoe.trim() !== '',
-  ), [solicitudes]);
+  const handlePageChange = useCallback((nextPage) => setPage(nextPage), []);
+  const handlePageSizeChange = useCallback((nextPageSize) => {
+    setPage(0);
+    setPageSize(nextPageSize);
+  }, []);
+  const handleSortModelChange = useCallback((nextSortModel) => {
+    setPage(0);
+    setSortModel(nextSortModel);
+  }, []);
+  const handleSearch = useCallback((nextSearch) => {
+    setPage(0);
+    setSearch(nextSearch);
+  }, []);
+  const handleReload = useCallback(() => {
+    setSearch('');
+    setPage(0);
+    setRefreshKey((prev) => prev + 1);
+  }, []);
+
+  useEffect(() => {
+    if (error) {
+      notify.error(error.message || 'No fue posible cargar las solicitudes.');
+    }
+  }, [error, notify]);
+
+  const hasAcuerdoRvoe = hasAcuerdoRvoeFromApi ?? solicitudes.some(
+    (solicitud) => solicitud.programa?.acuerdoRvoe
+      && solicitud.programa.acuerdoRvoe.trim() !== '',
+  );
+  const isInitialLoading = !isSessionReady
+    || (loading && !hasCompletedInitialLoadRef.current);
 
   const options = useMemo(() => {
     const baseOptions = [
@@ -109,6 +151,8 @@ export default function Solicitudes() {
 
   return (
     <Layout title="Solicitudes">
+      <Loading loading={isInitialLoading} />
+      {isInitialLoading && <SolicitudesSkeleton />}
       {newSolicitud && (
         <Select
           title="Seleccione una opción"
@@ -125,11 +169,24 @@ export default function Solicitudes() {
       {ActualizacionContentVisible && <Actualizacion />}
       {/* {RepLegalContentVisible && <CambioRepresentanteLegal />} */}
       {NombreInstitucionContentVisible && <CambioNombreInstitucion />}
-      <DataTable
-        title="Tabla de solicitudes"
-        rows={rows}
-        columns={columnsSolicitudes(session.rol)}
-      />
+      {!isInitialLoading && (
+        <DataTable
+          title="Tabla de solicitudes"
+          rows={rows}
+          columns={columnsSolicitudes(session.rol)}
+          paginationMode="server"
+          rowCount={pagination.total}
+          page={page}
+          pageSize={pageSize}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          sortModel={sortModel}
+          onSortModelChange={handleSortModelChange}
+          onSearch={handleSearch}
+          onReloadClick={handleReload}
+          loading={loading}
+        />
+      )}
     </Layout>
   );
 }
